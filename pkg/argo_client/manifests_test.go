@@ -20,6 +20,98 @@ import (
 	"github.com/zapier/kubechecks/pkg/vcs"
 )
 
+func TestIsExternalHelmChart(t *testing.T) {
+	testcases := map[string]struct {
+		source   v1alpha1.ApplicationSource
+		expected bool
+	}{
+		"oci-chart": {
+			source: v1alpha1.ApplicationSource{
+				RepoURL: "oci://registry.example.io/charts",
+				Chart:   "my-chart",
+			},
+			expected: true,
+		},
+		"https-helm-repo": {
+			source: v1alpha1.ApplicationSource{
+				RepoURL: "https://charts.example.io",
+				Chart:   "my-chart",
+			},
+			expected: true,
+		},
+		"https-git-repo-with-chart-field": {
+			// .git suffix indicates it is a git repo, not a Helm HTTPS repo
+			source: v1alpha1.ApplicationSource{
+				RepoURL: "https://github.com/org/repo.git",
+				Chart:   "my-chart",
+			},
+			expected: false,
+		},
+		"git-path-source-no-chart": {
+			// source.Chart is empty — it's a git-path source
+			source: v1alpha1.ApplicationSource{
+				RepoURL: "oci://registry.example.io/charts",
+				Path:    "helm/app",
+			},
+			expected: false,
+		},
+		"plain-git-repo": {
+			source: v1alpha1.ApplicationSource{
+				RepoURL: "git@github.com:org/repo.git",
+				Path:    "app/",
+			},
+			expected: false,
+		},
+		"https-helm-repo-with-path": {
+			// Has source.Path set — treat as git-path source, not external Helm chart
+			source: v1alpha1.ApplicationSource{
+				RepoURL: "https://charts.example.io",
+				Chart:   "my-chart",
+				Path:    "some/path",
+			},
+			expected: false,
+		},
+		"oci-shorthand-docker-io": {
+			// OCI registry without scheme (ArgoCD shorthand format)
+			source: v1alpha1.ApplicationSource{
+				RepoURL: "docker.io/envoyproxy",
+				Chart:   "gateway-helm",
+			},
+			expected: true,
+		},
+		"oci-shorthand-ghcr": {
+			source: v1alpha1.ApplicationSource{
+				RepoURL: "ghcr.io/org/charts",
+				Chart:   "my-chart",
+			},
+			expected: true,
+		},
+		"oci-shorthand-no-chart": {
+			// No Chart field — not an external Helm chart
+			source: v1alpha1.ApplicationSource{
+				RepoURL: "docker.io/envoyproxy",
+				Path:    "some/path",
+			},
+			expected: false,
+		},
+		"oci-shorthand-git-suffix": {
+			// .git suffix means it's a git repo even without scheme
+			source: v1alpha1.ApplicationSource{
+				RepoURL: "github.com/org/repo.git",
+				Chart:   "my-chart",
+			},
+			expected: false,
+		},
+	}
+
+	for name, tc := range testcases {
+		t.Run(name, func(t *testing.T) {
+			actual := isExternalHelmChart(tc.source)
+			assert.Equal(t, tc.expected, actual)
+		})
+	}
+}
+
 func TestAreSameTargetRef(t *testing.T) {
 	testcases := map[string]struct {
 		ref1, ref2 string
@@ -387,6 +479,61 @@ resources:
 				"base/crds/crd2.yaml":           {"git@github.com:testuser/testrepo.git", "main", "base/crds/crd2.yaml"},
 				"component1/kustomization.yaml": {"git@github.com:testuser/testrepo.git", "main", "component1/kustomization.yaml"},
 				"component1/resource3.yaml":     {"git@github.com:testuser/testrepo.git", "main", "component1/resource3.yaml"},
+			},
+		},
+
+		"wildcard-value-files-are-expanded": {
+			pullRequest: vcs.PullRequest{
+				CloneURL: "git@github.com:testuser/testrepo.git",
+				BaseRef:  "main",
+				HeadRef:  "update-code",
+			},
+			app: v1alpha1.Application{
+				Spec: v1alpha1.ApplicationSpec{
+					Sources: []v1alpha1.ApplicationSource{
+						{
+							RepoURL:        "git@github.com:testuser/testrepo.git",
+							Path:           "app1/",
+							TargetRevision: "main",
+							Helm: &v1alpha1.ApplicationSourceHelm{
+								IgnoreMissingValueFiles: true,
+								ValueFiles: []string{
+									"./values.yaml",
+									"./values-*.yaml",
+									"../shared/values-*.yaml",
+									"./no-match-*.yaml",
+								},
+							},
+						},
+					},
+				},
+			},
+			filesByRepo: map[repoTarget]set[string]{
+				repoTarget{"git@github.com:testuser/testrepo.git", "main"}: newSet[string](
+					"app1/values.yaml",
+					"app1/values-clusterA.yaml",
+					"app1/values-clusterB.yaml",
+					"app1/unrelated.yaml",
+					"shared/values-shared-1.yaml",
+					"shared/values-shared-2.yaml",
+					"shared/other.yaml",
+				),
+			},
+			filesByRepoWithContent: map[repoTarget]map[string]string{
+				repoTarget{"git@github.com:testuser/testrepo.git", "main"}: {
+					"app1/Chart.yaml": `apiVersion: v2
+name: test-chart
+version: 1.0.0`,
+				},
+			},
+			expectedFiles: map[string]repoTargetPath{
+				"app1/Chart.yaml":             {"git@github.com:testuser/testrepo.git", "main", "app1/Chart.yaml"},
+				"app1/values.yaml":            {"git@github.com:testuser/testrepo.git", "main", "app1/values.yaml"},
+				"app1/values-clusterA.yaml":   {"git@github.com:testuser/testrepo.git", "main", "app1/values-clusterA.yaml"},
+				"app1/values-clusterB.yaml":   {"git@github.com:testuser/testrepo.git", "main", "app1/values-clusterB.yaml"},
+				"app1/unrelated.yaml":         {"git@github.com:testuser/testrepo.git", "main", "app1/unrelated.yaml"},
+				"shared/values-shared-1.yaml": {"git@github.com:testuser/testrepo.git", "main", "shared/values-shared-1.yaml"},
+				"shared/values-shared-2.yaml": {"git@github.com:testuser/testrepo.git", "main", "shared/values-shared-2.yaml"},
 			},
 		},
 
