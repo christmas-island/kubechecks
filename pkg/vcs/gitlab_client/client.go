@@ -244,7 +244,7 @@ func (c *Client) LoadHook(ctx context.Context, id string) (vcs.PullRequest, erro
 		return nilPr, errors.Wrapf(err, "failed to get project '%s'", repoPath)
 	}
 
-	mergeRequest, _, err := c.c.MergeRequests.GetMergeRequest(repoPath, int(mrNumber), nil, gitlab.WithContext(ctx))
+	mergeRequest, _, err := c.c.MergeRequests.GetMergeRequest(repoPath, mrNumber, nil, gitlab.WithContext(ctx))
 	if err != nil {
 		return nilPr, errors.Wrapf(err, "failed to get merge request '%d' in project '%s'", mrNumber, repoPath)
 	}
@@ -257,7 +257,7 @@ func (c *Client) LoadHook(ctx context.Context, id string) (vcs.PullRequest, erro
 		CloneURL:      project.HTTPURLToRepo,
 		Name:          project.Name,
 		Owner:         "",
-		CheckID:       mergeRequest.IID,
+		CheckID:       int(mergeRequest.IID),
 		SHA:           mergeRequest.SHA,
 		FullName:      project.PathWithNamespace,
 		Username:      c.username,
@@ -282,7 +282,7 @@ func (c *Client) buildRepoFromEvent(event *gitlab.MergeEvent) vcs.PullRequest {
 		FullName:      event.Project.PathWithNamespace,
 		CloneURL:      event.Project.GitHTTPURL,
 		Name:          event.Project.Name,
-		CheckID:       event.ObjectAttributes.IID,
+		CheckID:       int(event.ObjectAttributes.IID),
 		SHA:           event.ObjectAttributes.LastCommit.ID,
 		Username:      c.username,
 		Email:         c.email,
@@ -305,7 +305,7 @@ func (c *Client) buildRepoFromComment(event *gitlab.MergeCommentEvent) vcs.PullR
 		FullName:      event.Project.PathWithNamespace,
 		CloneURL:      event.Project.GitHTTPURL,
 		Name:          event.Project.Name,
-		CheckID:       event.MergeRequest.IID,
+		CheckID:       int(event.MergeRequest.IID),
 		SHA:           event.MergeRequest.LastCommit.ID,
 		Username:      c.username,
 		Email:         c.email,
@@ -324,7 +324,7 @@ func (c *Client) GetPullRequestFiles(ctx context.Context, pr vcs.PullRequest) ([
 		Msg("fetching MR files from GitLab API")
 
 	// List all diffs for the merge request
-	diffs, _, err := c.c.MergeRequests.ListMergeRequestDiffs(pr.FullName, pr.CheckID, nil, gitlab.WithContext(ctx))
+	diffs, _, err := c.c.MergeRequests.ListMergeRequestDiffs(pr.FullName, int64(pr.CheckID), nil, gitlab.WithContext(ctx))
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to list MR diffs from GitLab")
 	}

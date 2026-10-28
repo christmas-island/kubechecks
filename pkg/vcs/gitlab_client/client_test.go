@@ -434,7 +434,7 @@ type MockMergeRequestsService struct {
 	mock.Mock
 }
 
-func (m *MockMergeRequestsService) GetMergeRequestDiffVersions(pid interface{}, mergeRequest int, opt *gitlab.GetMergeRequestDiffVersionsOptions, options ...gitlab.RequestOptionFunc) ([]*gitlab.MergeRequestDiffVersion, *gitlab.Response, error) {
+func (m *MockMergeRequestsService) GetMergeRequestDiffVersions(pid interface{}, mergeRequest int64, opt *gitlab.GetMergeRequestDiffVersionsOptions, options ...gitlab.RequestOptionFunc) ([]*gitlab.MergeRequestDiffVersion, *gitlab.Response, error) {
 	args := m.Called(pid, mergeRequest, opt, options)
 	if args.Get(0) == nil {
 		return nil, args.Get(1).(*gitlab.Response), args.Error(2)
@@ -442,7 +442,7 @@ func (m *MockMergeRequestsService) GetMergeRequestDiffVersions(pid interface{}, 
 	return args.Get(0).([]*gitlab.MergeRequestDiffVersion), args.Get(1).(*gitlab.Response), args.Error(2)
 }
 
-func (m *MockMergeRequestsService) ListMergeRequestDiffs(pid interface{}, mergeRequest int, opt *gitlab.ListMergeRequestDiffsOptions, options ...gitlab.RequestOptionFunc) ([]*gitlab.MergeRequestDiff, *gitlab.Response, error) {
+func (m *MockMergeRequestsService) ListMergeRequestDiffs(pid interface{}, mergeRequest int64, opt *gitlab.ListMergeRequestDiffsOptions, options ...gitlab.RequestOptionFunc) ([]*gitlab.MergeRequestDiff, *gitlab.Response, error) {
 	args := m.Called(pid, mergeRequest, opt, options)
 	if args.Get(0) == nil {
 		return nil, args.Get(1).(*gitlab.Response), args.Error(2)
@@ -450,7 +450,7 @@ func (m *MockMergeRequestsService) ListMergeRequestDiffs(pid interface{}, mergeR
 	return args.Get(0).([]*gitlab.MergeRequestDiff), args.Get(1).(*gitlab.Response), args.Error(2)
 }
 
-func (m *MockMergeRequestsService) UpdateMergeRequest(pid interface{}, mergeRequest int, opt *gitlab.UpdateMergeRequestOptions, options ...gitlab.RequestOptionFunc) (*gitlab.MergeRequest, *gitlab.Response, error) {
+func (m *MockMergeRequestsService) UpdateMergeRequest(pid interface{}, mergeRequest int64, opt *gitlab.UpdateMergeRequestOptions, options ...gitlab.RequestOptionFunc) (*gitlab.MergeRequest, *gitlab.Response, error) {
 	args := m.Called(pid, mergeRequest, opt, options)
 	if args.Get(0) == nil {
 		return nil, args.Get(1).(*gitlab.Response), args.Error(2)
@@ -458,7 +458,7 @@ func (m *MockMergeRequestsService) UpdateMergeRequest(pid interface{}, mergeRequ
 	return args.Get(0).(*gitlab.MergeRequest), args.Get(1).(*gitlab.Response), args.Error(2)
 }
 
-func (m *MockMergeRequestsService) GetMergeRequest(pid interface{}, mergeRequest int, opt *gitlab.GetMergeRequestsOptions, options ...gitlab.RequestOptionFunc) (*gitlab.MergeRequest, *gitlab.Response, error) {
+func (m *MockMergeRequestsService) GetMergeRequest(pid interface{}, mergeRequest int64, opt *gitlab.GetMergeRequestsOptions, options ...gitlab.RequestOptionFunc) (*gitlab.MergeRequest, *gitlab.Response, error) {
 	args := m.Called(pid, mergeRequest, opt, options)
 	if args.Get(0) == nil {
 		return nil, args.Get(1).(*gitlab.Response), args.Error(2)
