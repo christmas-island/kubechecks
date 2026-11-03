@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/argoproj/argo-cd/gitops-engine/pkg/sync/hook"
 	cmdutil "github.com/argoproj/argo-cd/v3/cmd/util"
 	argoappv1 "github.com/argoproj/argo-cd/v3/pkg/apis/application/v1alpha1"
-	"github.com/argoproj/gitops-engine/pkg/sync/hook"
 	"github.com/rs/zerolog/log"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 
@@ -55,7 +55,7 @@ func GenerateDiffText(ctx context.Context, request checks.Request) (string, erro
 	}
 
 	items := make([]objKeyLiveTarget, 0)
-	if items, err = groupObjsForDiff(resources, groupedObjs, items, argoSettings, app.Name, app.Spec.Destination.Namespace); err != nil {
+	if items, err = groupObjsForDiff(resources, groupedObjs, items, argoSettings, appInstanceName(request, argoSettings), app.Spec.Destination.Namespace); err != nil {
 		return "", err
 	}
 
