@@ -8,6 +8,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/argoproj/argo-cd/gitops-engine/pkg/diff"
+	"github.com/argoproj/argo-cd/gitops-engine/pkg/sync/hook"
+	"github.com/argoproj/argo-cd/gitops-engine/pkg/sync/ignore"
+	"github.com/argoproj/argo-cd/gitops-engine/pkg/utils/kube"
 	cmdutil "github.com/argoproj/argo-cd/v3/cmd/util"
 	"github.com/argoproj/argo-cd/v3/controller"
 	"github.com/argoproj/argo-cd/v3/pkg/apiclient/application"
@@ -16,13 +20,11 @@ import (
 	"github.com/argoproj/argo-cd/v3/util/argo"
 	argodiff "github.com/argoproj/argo-cd/v3/util/argo/diff"
 	"github.com/argoproj/argo-cd/v3/util/argo/normalizers"
-	"github.com/argoproj/argo-cd/gitops-engine/pkg/diff"
-	"github.com/argoproj/argo-cd/gitops-engine/pkg/sync/hook"
-	"github.com/argoproj/argo-cd/gitops-engine/pkg/sync/ignore"
-	"github.com/argoproj/argo-cd/gitops-engine/pkg/utils/kube"
 	"github.com/ghodss/yaml"
+	"github.com/go-logr/logr"
 	"github.com/go-logr/zerologr"
 	"github.com/pmezard/go-difflib/difflib"
+	"github.com/rs/zerolog"
 	"github.com/rs/zerolog/log"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime/schema"
@@ -32,6 +34,14 @@ import (
 	"github.com/zapier/kubechecks/pkg/msg"
 	"github.com/zapier/kubechecks/telemetry"
 )
+
+// newDiffLogger creates a logr.Logger for the diff engine that suppresses V(1) debug noise.
+// gitops-engine logs CRD scheme warnings at V(1) which are harmless but noisy.
+// This creates a zerolog logger at WarnLevel so only warnings/errors pass through.
+func newDiffLogger() logr.Logger {
+	diffLogger := log.Logger.Level(zerolog.WarnLevel)
+	return zerologr.New(&diffLogger)
+}
 
 // from https://github.com/argoproj/argo-cd/blob/d3ff9757c460ae1a6a11e1231251b5d27aadcdd1/cmd/argocd/commands/app.go#L879
 type objKeyLiveTarget struct {
@@ -92,7 +102,7 @@ func Check(ctx context.Context, request checks.Request) (msg.Result, error) {
 		return msg.Result{}, err
 	}
 
-	if items, err = groupObjsForDiff(resources, groupedObjs, items, argoSettings, app.Name, app.Spec.Destination.Namespace); err != nil {
+	if items, err = groupObjsForDiff(resources, groupedObjs, items, argoSettings, appInstanceName(request, argoSettings), app.Spec.Destination.Namespace); err != nil {
 		return msg.Result{}, err
 	}
 
@@ -134,7 +144,9 @@ func Check(ctx context.Context, request checks.Request) (msg.Result, error) {
 
 	cr.Details = fmt.Sprintf("```diff\n%s\n```", renderedDiff)
 
-	aiDiffSummary(ctx, request.Note, request.Container.Config, request.AppName, renderedDiff)
+	if request.Container.Config.EnableAIDiffSummary {
+		aiDiffSummary(ctx, request.Note, request.Container.Config, request.AppName, renderedDiff)
+	}
 
 	return cr, nil
 }
@@ -203,7 +215,7 @@ func generateDiff(ctx context.Context, request checks.Request, argoSettings *set
 		JQExecutionTimeout: 1 * time.Second,
 	}
 	diffConfig, err := argodiff.NewDiffConfigBuilder().
-		WithLogger(zerologr.New(&log.Logger)).
+		WithLogger(newDiffLogger()).
 		WithDiffSettings(request.App.Spec.IgnoreDifferences, overrides, ignoreAggregatedRoles, ignoreNormalizerOpts).
 		WithTracking(argoSettings.AppLabelKey, argoSettings.TrackingMethod).
 		WithNoCache().
@@ -230,6 +242,7 @@ func getResources(ctx context.Context, request checks.Request) ([]*argoappv1.Res
 
 	resources, err := appClient.ManagedResources(ctx, &application.ResourcesQuery{
 		ApplicationName: &request.App.Name,
+		AppNamespace:    &request.App.Namespace,
 	})
 	if err != nil {
 		if isAppMissingErr(err) {
@@ -240,6 +253,19 @@ func getResources(ctx context.Context, request checks.Request) ([]*argoappv1.Res
 		return nil, err
 	}
 	return resources.Items, nil
+}
+
+// appInstanceName returns the app instance name exactly as Argo CD records it in
+// resource tracking ids. Under apps-in-any-namespace an Application living outside
+// the Argo CD controller namespace is qualified as `<appNamespace>_<appName>`, so
+// diffing against the bare name reports a tracking-id change on every resource of
+// every such app.
+func appInstanceName(request checks.Request, argoSettings *settings.Settings) string {
+	controllerNamespace := argoSettings.GetControllerNamespace()
+	if controllerNamespace == "" {
+		controllerNamespace = request.Container.Config.ArgoCDNamespace
+	}
+	return request.App.InstanceName(controllerNamespace)
 }
 
 func getArgoSettings(ctx context.Context, request checks.Request) (*settings.Settings, error) {
@@ -294,7 +320,10 @@ func groupObjsByKey(localObs []*unstructured.Unstructured, liveObjs []*unstructu
 			namespacedByGk[schema.GroupKind{Group: key.Group, Kind: key.Kind}] = key.Namespace != ""
 		}
 	}
-	localObs, _, err := controller.DeduplicateTargetObjects(appNamespace, localObs, &resourceInfoProvider{namespacedByGk: namespacedByGk})
+	// argo-cd v3.5 renamed DeduplicateTargetObjects to NormalizeTargetObjects and added a
+	// setAppInstance callback. It only fires when a namespace was corrected, which the old
+	// dedup-only function never did, so a no-op keeps the previous behaviour.
+	localObs, _, err := controller.NormalizeTargetObjects(appNamespace, localObs, &resourceInfoProvider{namespacedByGk: namespacedByGk}, func(*unstructured.Unstructured) error { return nil })
 	if err != nil {
 		return nil, err
 	}
@@ -327,7 +356,8 @@ func groupObjsForDiff(resources []*argoappv1.ResourceDiff, objs map[kube.Resourc
 		if local, ok := objs[key]; ok || live != nil {
 			if local != nil && !kube.IsCRD(local) {
 				if err := resourceTracking.SetAppInstance(
-					local, argoSettings.AppLabelKey, appName, namespace, argoappv1.TrackingMethod(argoSettings.GetTrackingMethod()), "",
+					local, argoSettings.AppLabelKey, appName, namespace,
+					argoappv1.TrackingMethod(argoSettings.GetTrackingMethod()), argoSettings.GetInstallationID(),
 				); err != nil {
 					return nil, err
 				}

@@ -328,22 +328,31 @@ func (_c *MockClient_Email_Call) RunAndReturn(run func() string) *MockClient_Ema
 }
 
 // GetAuthHeaders provides a mock function for the type MockClient
-func (_mock *MockClient) GetAuthHeaders() map[string]string {
-	ret := _mock.Called()
+func (_mock *MockClient) GetAuthHeaders(ctx context.Context) (map[string]string, error) {
+	ret := _mock.Called(ctx)
 
 	if len(ret) == 0 {
 		panic("no return value specified for GetAuthHeaders")
 	}
 
 	var r0 map[string]string
-	if returnFunc, ok := ret.Get(0).(func() map[string]string); ok {
-		r0 = returnFunc()
+	var r1 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context) (map[string]string, error)); ok {
+		return returnFunc(ctx)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context) map[string]string); ok {
+		r0 = returnFunc(ctx)
 	} else {
 		if ret.Get(0) != nil {
 			r0 = ret.Get(0).(map[string]string)
 		}
 	}
-	return r0
+	if returnFunc, ok := ret.Get(1).(func(context.Context) error); ok {
+		r1 = returnFunc(ctx)
+	} else {
+		r1 = ret.Error(1)
+	}
+	return r0, r1
 }
 
 // MockClient_GetAuthHeaders_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GetAuthHeaders'
@@ -352,23 +361,30 @@ type MockClient_GetAuthHeaders_Call struct {
 }
 
 // GetAuthHeaders is a helper method to define mock.On call
-func (_e *MockClient_Expecter) GetAuthHeaders() *MockClient_GetAuthHeaders_Call {
-	return &MockClient_GetAuthHeaders_Call{Call: _e.mock.On("GetAuthHeaders")}
+//   - ctx context.Context
+func (_e *MockClient_Expecter) GetAuthHeaders(ctx interface{}) *MockClient_GetAuthHeaders_Call {
+	return &MockClient_GetAuthHeaders_Call{Call: _e.mock.On("GetAuthHeaders", ctx)}
 }
 
-func (_c *MockClient_GetAuthHeaders_Call) Run(run func()) *MockClient_GetAuthHeaders_Call {
+func (_c *MockClient_GetAuthHeaders_Call) Run(run func(ctx context.Context)) *MockClient_GetAuthHeaders_Call {
 	_c.Call.Run(func(args mock.Arguments) {
-		run()
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		run(
+			arg0,
+		)
 	})
 	return _c
 }
 
-func (_c *MockClient_GetAuthHeaders_Call) Return(stringToString map[string]string) *MockClient_GetAuthHeaders_Call {
-	_c.Call.Return(stringToString)
+func (_c *MockClient_GetAuthHeaders_Call) Return(stringToString map[string]string, err error) *MockClient_GetAuthHeaders_Call {
+	_c.Call.Return(stringToString, err)
 	return _c
 }
 
-func (_c *MockClient_GetAuthHeaders_Call) RunAndReturn(run func() map[string]string) *MockClient_GetAuthHeaders_Call {
+func (_c *MockClient_GetAuthHeaders_Call) RunAndReturn(run func(ctx context.Context) (map[string]string, error)) *MockClient_GetAuthHeaders_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -559,6 +575,72 @@ func (_c *MockClient_GetPullRequestFiles_Call) RunAndReturn(run func(ctx context
 	return _c
 }
 
+// GitCredentials provides a mock function for the type MockClient
+func (_mock *MockClient) GitCredentials(ctx context.Context) (string, string, error) {
+	ret := _mock.Called(ctx)
+
+	if len(ret) == 0 {
+		panic("no return value specified for GitCredentials")
+	}
+
+	var r0 string
+	var r1 string
+	var r2 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context) (string, string, error)); ok {
+		return returnFunc(ctx)
+	}
+	if returnFunc, ok := ret.Get(0).(func(context.Context) string); ok {
+		r0 = returnFunc(ctx)
+	} else {
+		r0 = ret.Get(0).(string)
+	}
+	if returnFunc, ok := ret.Get(1).(func(context.Context) string); ok {
+		r1 = returnFunc(ctx)
+	} else {
+		r1 = ret.Get(1).(string)
+	}
+	if returnFunc, ok := ret.Get(2).(func(context.Context) error); ok {
+		r2 = returnFunc(ctx)
+	} else {
+		r2 = ret.Error(2)
+	}
+	return r0, r1, r2
+}
+
+// MockClient_GitCredentials_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'GitCredentials'
+type MockClient_GitCredentials_Call struct {
+	*mock.Call
+}
+
+// GitCredentials is a helper method to define mock.On call
+//   - ctx context.Context
+func (_e *MockClient_Expecter) GitCredentials(ctx interface{}) *MockClient_GitCredentials_Call {
+	return &MockClient_GitCredentials_Call{Call: _e.mock.On("GitCredentials", ctx)}
+}
+
+func (_c *MockClient_GitCredentials_Call) Run(run func(ctx context.Context)) *MockClient_GitCredentials_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		run(
+			arg0,
+		)
+	})
+	return _c
+}
+
+func (_c *MockClient_GitCredentials_Call) Return(username string, password string, err error) *MockClient_GitCredentials_Call {
+	_c.Call.Return(username, password, err)
+	return _c
+}
+
+func (_c *MockClient_GitCredentials_Call) RunAndReturn(run func(ctx context.Context) (string, string, error)) *MockClient_GitCredentials_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // LoadHook provides a mock function for the type MockClient
 func (_mock *MockClient) LoadHook(ctx context.Context, repoAndId string) (vcs.PullRequest, error) {
 	ret := _mock.Called(ctx, repoAndId)
@@ -621,6 +703,50 @@ func (_c *MockClient_LoadHook_Call) Return(pullRequest vcs.PullRequest, err erro
 }
 
 func (_c *MockClient_LoadHook_Call) RunAndReturn(run func(ctx context.Context, repoAndId string) (vcs.PullRequest, error)) *MockClient_LoadHook_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
+// MaxCommentLength provides a mock function for the type MockClient
+func (_mock *MockClient) MaxCommentLength() int {
+	ret := _mock.Called()
+
+	if len(ret) == 0 {
+		panic("no return value specified for MaxCommentLength")
+	}
+
+	var r0 int
+	if returnFunc, ok := ret.Get(0).(func() int); ok {
+		r0 = returnFunc()
+	} else {
+		r0 = ret.Get(0).(int)
+	}
+	return r0
+}
+
+// MockClient_MaxCommentLength_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'MaxCommentLength'
+type MockClient_MaxCommentLength_Call struct {
+	*mock.Call
+}
+
+// MaxCommentLength is a helper method to define mock.On call
+func (_e *MockClient_Expecter) MaxCommentLength() *MockClient_MaxCommentLength_Call {
+	return &MockClient_MaxCommentLength_Call{Call: _e.mock.On("MaxCommentLength")}
+}
+
+func (_c *MockClient_MaxCommentLength_Call) Run(run func()) *MockClient_MaxCommentLength_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		run()
+	})
+	return _c
+}
+
+func (_c *MockClient_MaxCommentLength_Call) Return(n int) *MockClient_MaxCommentLength_Call {
+	_c.Call.Return(n)
+	return _c
+}
+
+func (_c *MockClient_MaxCommentLength_Call) RunAndReturn(run func() int) *MockClient_MaxCommentLength_Call {
 	_c.Call.Return(run)
 	return _c
 }
@@ -771,6 +897,75 @@ func (_c *MockClient_PostMessage_Call) RunAndReturn(run func(context1 context.Co
 	return _c
 }
 
+// PostReviewSuggestions provides a mock function for the type MockClient
+func (_mock *MockClient) PostReviewSuggestions(ctx context.Context, pr vcs.PullRequest, summary string, suggestions []vcs.ReviewSuggestion) error {
+	ret := _mock.Called(ctx, pr, summary, suggestions)
+
+	if len(ret) == 0 {
+		panic("no return value specified for PostReviewSuggestions")
+	}
+
+	var r0 error
+	if returnFunc, ok := ret.Get(0).(func(context.Context, vcs.PullRequest, string, []vcs.ReviewSuggestion) error); ok {
+		r0 = returnFunc(ctx, pr, summary, suggestions)
+	} else {
+		r0 = ret.Error(0)
+	}
+	return r0
+}
+
+// MockClient_PostReviewSuggestions_Call is a *mock.Call that shadows Run/Return methods with type explicit version for method 'PostReviewSuggestions'
+type MockClient_PostReviewSuggestions_Call struct {
+	*mock.Call
+}
+
+// PostReviewSuggestions is a helper method to define mock.On call
+//   - ctx context.Context
+//   - pr vcs.PullRequest
+//   - summary string
+//   - suggestions []vcs.ReviewSuggestion
+func (_e *MockClient_Expecter) PostReviewSuggestions(ctx interface{}, pr interface{}, summary interface{}, suggestions interface{}) *MockClient_PostReviewSuggestions_Call {
+	return &MockClient_PostReviewSuggestions_Call{Call: _e.mock.On("PostReviewSuggestions", ctx, pr, summary, suggestions)}
+}
+
+func (_c *MockClient_PostReviewSuggestions_Call) Run(run func(ctx context.Context, pr vcs.PullRequest, summary string, suggestions []vcs.ReviewSuggestion)) *MockClient_PostReviewSuggestions_Call {
+	_c.Call.Run(func(args mock.Arguments) {
+		var arg0 context.Context
+		if args[0] != nil {
+			arg0 = args[0].(context.Context)
+		}
+		var arg1 vcs.PullRequest
+		if args[1] != nil {
+			arg1 = args[1].(vcs.PullRequest)
+		}
+		var arg2 string
+		if args[2] != nil {
+			arg2 = args[2].(string)
+		}
+		var arg3 []vcs.ReviewSuggestion
+		if args[3] != nil {
+			arg3 = args[3].([]vcs.ReviewSuggestion)
+		}
+		run(
+			arg0,
+			arg1,
+			arg2,
+			arg3,
+		)
+	})
+	return _c
+}
+
+func (_c *MockClient_PostReviewSuggestions_Call) Return(err error) *MockClient_PostReviewSuggestions_Call {
+	_c.Call.Return(err)
+	return _c
+}
+
+func (_c *MockClient_PostReviewSuggestions_Call) RunAndReturn(run func(ctx context.Context, pr vcs.PullRequest, summary string, suggestions []vcs.ReviewSuggestion) error) *MockClient_PostReviewSuggestions_Call {
+	_c.Call.Return(run)
+	return _c
+}
+
 // TidyOutdatedComments provides a mock function for the type MockClient
 func (_mock *MockClient) TidyOutdatedComments(context1 context.Context, pullRequest vcs.PullRequest) error {
 	ret := _mock.Called(context1, pullRequest)
@@ -880,16 +1075,16 @@ func (_c *MockClient_ToEmoji_Call) RunAndReturn(run func(commitState pkg.CommitS
 }
 
 // UpdateMessage provides a mock function for the type MockClient
-func (_mock *MockClient) UpdateMessage(context1 context.Context, message *msg.Message, s string) error {
-	ret := _mock.Called(context1, message, s)
+func (_mock *MockClient) UpdateMessage(ctx context.Context, pr vcs.PullRequest, noteID int, chunks []string) error {
+	ret := _mock.Called(ctx, pr, noteID, chunks)
 
 	if len(ret) == 0 {
 		panic("no return value specified for UpdateMessage")
 	}
 
 	var r0 error
-	if returnFunc, ok := ret.Get(0).(func(context.Context, *msg.Message, string) error); ok {
-		r0 = returnFunc(context1, message, s)
+	if returnFunc, ok := ret.Get(0).(func(context.Context, vcs.PullRequest, int, []string) error); ok {
+		r0 = returnFunc(ctx, pr, noteID, chunks)
 	} else {
 		r0 = ret.Error(0)
 	}
@@ -902,31 +1097,37 @@ type MockClient_UpdateMessage_Call struct {
 }
 
 // UpdateMessage is a helper method to define mock.On call
-//   - context1 context.Context
-//   - message *msg.Message
-//   - s string
-func (_e *MockClient_Expecter) UpdateMessage(context1 interface{}, message interface{}, s interface{}) *MockClient_UpdateMessage_Call {
-	return &MockClient_UpdateMessage_Call{Call: _e.mock.On("UpdateMessage", context1, message, s)}
+//   - ctx context.Context
+//   - pr vcs.PullRequest
+//   - noteID int
+//   - chunks []string
+func (_e *MockClient_Expecter) UpdateMessage(ctx interface{}, pr interface{}, noteID interface{}, chunks interface{}) *MockClient_UpdateMessage_Call {
+	return &MockClient_UpdateMessage_Call{Call: _e.mock.On("UpdateMessage", ctx, pr, noteID, chunks)}
 }
 
-func (_c *MockClient_UpdateMessage_Call) Run(run func(context1 context.Context, message *msg.Message, s string)) *MockClient_UpdateMessage_Call {
+func (_c *MockClient_UpdateMessage_Call) Run(run func(ctx context.Context, pr vcs.PullRequest, noteID int, chunks []string)) *MockClient_UpdateMessage_Call {
 	_c.Call.Run(func(args mock.Arguments) {
 		var arg0 context.Context
 		if args[0] != nil {
 			arg0 = args[0].(context.Context)
 		}
-		var arg1 *msg.Message
+		var arg1 vcs.PullRequest
 		if args[1] != nil {
-			arg1 = args[1].(*msg.Message)
+			arg1 = args[1].(vcs.PullRequest)
 		}
-		var arg2 string
+		var arg2 int
 		if args[2] != nil {
-			arg2 = args[2].(string)
+			arg2 = args[2].(int)
+		}
+		var arg3 []string
+		if args[3] != nil {
+			arg3 = args[3].([]string)
 		}
 		run(
 			arg0,
 			arg1,
 			arg2,
+			arg3,
 		)
 	})
 	return _c
@@ -937,7 +1138,7 @@ func (_c *MockClient_UpdateMessage_Call) Return(err error) *MockClient_UpdateMes
 	return _c
 }
 
-func (_c *MockClient_UpdateMessage_Call) RunAndReturn(run func(context1 context.Context, message *msg.Message, s string) error) *MockClient_UpdateMessage_Call {
+func (_c *MockClient_UpdateMessage_Call) RunAndReturn(run func(ctx context.Context, pr vcs.PullRequest, noteID int, chunks []string) error) *MockClient_UpdateMessage_Call {
 	_c.Call.Return(run)
 	return _c
 }

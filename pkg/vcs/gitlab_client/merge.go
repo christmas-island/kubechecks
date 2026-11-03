@@ -23,28 +23,42 @@ type Changes struct {
 	DeletedFile bool   `json:"deleted_file"`
 }
 
-func (c *Client) GetMergeChanges(ctx context.Context, projectId int, mergeReqId int) ([]*Changes, error) {
+func (c *Client) GetMergeChanges(ctx context.Context, projectId int, mergeReqId int64) ([]*Changes, error) {
 	_, span := tracer.Start(ctx, "GetMergeChanges")
 	defer span.End()
 
 	var changes []*Changes
-	diffs, _, err := c.c.MergeRequests.ListMergeRequestDiffs(projectId, int64(mergeReqId), &gitlab.ListMergeRequestDiffsOptions{})
-	if err != nil {
-		telemetry.SetError(span, err, "Get MergeRequest Changes")
-		return changes, err
+	opts := &gitlab.ListMergeRequestDiffsOptions{
+		ListOptions: gitlab.ListOptions{
+			PerPage: 100,
+			Page:    1,
+		},
 	}
 
-	for _, change := range diffs {
-		changes = append(changes, &Changes{
-			OldPath:     change.OldPath,
-			NewPath:     change.NewPath,
-			AMode:       change.AMode,
-			BMode:       change.BMode,
-			Diff:        change.Diff,
-			NewFile:     change.NewFile,
-			RenamedFile: change.RenamedFile,
-			DeletedFile: change.DeletedFile,
-		})
+	for {
+		diffs, resp, err := c.c.MergeRequests.ListMergeRequestDiffs(projectId, int64(mergeReqId), opts)
+		if err != nil {
+			telemetry.SetError(span, err, "Get MergeRequest Changes")
+			return changes, err
+		}
+
+		for _, change := range diffs {
+			changes = append(changes, &Changes{
+				OldPath:     change.OldPath,
+				NewPath:     change.NewPath,
+				AMode:       change.AMode,
+				BMode:       change.BMode,
+				Diff:        change.Diff,
+				NewFile:     change.NewFile,
+				RenamedFile: change.RenamedFile,
+				DeletedFile: change.DeletedFile,
+			})
+		}
+
+		if resp.NextPage == 0 {
+			break
+		}
+		opts.Page = resp.NextPage
 	}
 
 	return changes, nil

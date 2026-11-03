@@ -1,6 +1,7 @@
 package config
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"strings"
@@ -13,6 +14,13 @@ import (
 
 	"github.com/zapier/kubechecks/pkg"
 )
+
+// GitCredsFunc returns HTTP basic-auth credentials for git-over-HTTPS operations
+// (cloning policy and schema repositories). The returned password may be short-lived —
+// for example a GitHub App installation token that is refreshed on demand — so callers
+// must invoke this per operation and must not cache the result. An empty password means
+// anonymous access.
+type GitCredsFunc func(ctx context.Context) (username, password string, err error)
 
 // set default values in /cmd/root.go's init function
 
@@ -50,6 +58,12 @@ type ServerConfig struct {
 	GithubAppID          int64  `mapstructure:"github-app-id"`
 	GithubInstallationID int64  `mapstructure:"github-installation-id"`
 
+	// GitCreds supplies credentials for git-over-HTTPS operations (cloning policy and
+	// schema repositories). It is populated at startup from the VCS client rather than
+	// from configuration — a static token for PAT auth, or a refreshing installation
+	// token for GitHub App auth. When nil, git operations fall back to VcsToken.
+	GitCreds GitCredsFunc `mapstructure:"-" json:"-"`
+
 	// webhooks
 	EnsureWebhooks bool   `mapstructure:"ensure-webhooks"`
 	WebhookSecret  string `mapstructure:"webhook-secret"`
@@ -72,6 +86,21 @@ type ServerConfig struct {
 	WorstPreupgradeState  pkg.CommitState `mapstructure:"worst-preupgrade-state"`
 	KubepugGeneratedStore string          `mapstructure:"kubepug-generated-store"`
 
+	// ai
+	EnableAIDiffSummary       bool            `mapstructure:"enable-ai-diff-summary"`
+	EnableAIReview            bool            `mapstructure:"enable-ai-review"`
+	AIReviewPostSuggestions   bool            `mapstructure:"ai-review-post-suggestions"`
+	AIReviewProvider          string          `mapstructure:"ai-review-provider"`
+	AIReviewModel             string          `mapstructure:"ai-review-model"`
+	AIReviewMaxApps           int             `mapstructure:"ai-review-max-apps"`
+	AIReviewMaxTurns          int             `mapstructure:"ai-review-max-turns"`
+	AIReviewTimeout           time.Duration   `mapstructure:"ai-review-timeout"`
+	AIReviewSystemPrompt      string          `mapstructure:"ai-review-system-prompt"`
+	AIReviewExtraInstructions string          `mapstructure:"ai-review-extra-instructions"`
+	AnthropicAPIKey           string          `mapstructure:"anthropic-api-key"`
+	ChartCacheDir             string          `mapstructure:"chart-cache-dir"`
+	WorstAIReviewState        pkg.CommitState `mapstructure:"worst-ai-review-state"`
+
 	// misc
 	AdditionalAppsNamespaces []string      `mapstructure:"additional-apps-namespaces"`
 	FallbackK8sVersion       string        `mapstructure:"fallback-k8s-version"`
@@ -85,14 +114,19 @@ type ServerConfig struct {
 	RepoCacheTTL             time.Duration `mapstructure:"repo-cache-ttl"`
 	ArchiveCacheDir          string        `mapstructure:"archive-cache-dir"`
 	ArchiveCacheTTL          time.Duration `mapstructure:"archive-cache-ttl"`
-	SchemasLocations         []string      `mapstructure:"schemas-location"`
-	ShowDebugInfo            bool          `mapstructure:"show-debug-info"`
-	TidyOutdatedCommentsMode string        `mapstructure:"tidy-outdated-comments-mode"`
-	MaxQueueSize             int64         `mapstructure:"max-queue-size"`
-	MaxConcurrentChecks      int           `mapstructure:"max-concurrent-checks"`
-	MaxRepoWorkerQueueSize   int           `mapstructure:"max-repo-worker-queue-size"`
-	ReplanCommentMessage     string        `mapstructure:"replan-comment-msg"`
-	Identifier               string        `mapstructure:"identifier"`
+	// SchemasLocations are searched, in order, for the schema of each resource. An
+	// absolute path, an http(s) location or a git url addresses something outside the
+	// pull request; a relative path names a directory inside the repository being
+	// checked, so schemas committed alongside the manifests that use them are found.
+	SchemasLocations         []string `mapstructure:"schemas-location"`
+	ShowDebugInfo            bool     `mapstructure:"show-debug-info"`
+	TidyOutdatedCommentsMode string   `mapstructure:"tidy-outdated-comments-mode"`
+	MaxQueueSize             int64    `mapstructure:"max-queue-size"`
+	MaxConcurrentChecks      int      `mapstructure:"max-concurrent-checks"`
+	MaxRepoWorkerQueueSize   int      `mapstructure:"max-repo-worker-queue-size"`
+	ReplanCommentMessage     string   `mapstructure:"replan-comment-msg"`
+	Identifier               string   `mapstructure:"identifier"`
+	MaxCommentsPerCheck      int      `mapstructure:"max-comments-per-check"`
 }
 
 func (cfg ServerConfig) IsGithubApp() bool {
@@ -134,6 +168,14 @@ func NewWithViper(v *viper.Viper) (ServerConfig, error) {
 
 	if cfg.VcsBaseUrl == "" {
 		cfg.VcsBaseUrl = fmt.Sprintf("https://%s.com", cfg.VcsType)
+	}
+
+	// not set at all, which is the case when there are no flag defaults behind viper
+	if cfg.MaxCommentsPerCheck == 0 {
+		cfg.MaxCommentsPerCheck = pkg.MaxCommentsPerCheck
+	}
+	if cfg.MaxCommentsPerCheck < 1 || cfg.MaxCommentsPerCheck > pkg.MaxCommentsPerCheck {
+		return cfg, fmt.Errorf("max-comments-per-check must be between 1 and %d, got %d", pkg.MaxCommentsPerCheck, cfg.MaxCommentsPerCheck)
 	}
 
 	log.Info().Msg("Server Configuration: ")
